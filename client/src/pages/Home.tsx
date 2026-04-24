@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getLoginUrl } from "@/const";
 import { useLocation } from "wouter";
-import { BookOpen, Calendar, Moon, Zap, Brain, MessageSquare, ArrowRight } from "lucide-react";
+import { BookOpen, Calendar, Moon, Zap, Brain, MessageSquare, ArrowRight, Stethoscope } from "lucide-react";
 
 export default function Home() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -86,6 +86,12 @@ export default function Home() {
               title="الشات الذكي"
               description="احصل على اقتراحات ذكية مخصصة لبياناتك"
               color="accent"
+            />
+            <FeatureCard
+              icon={<Stethoscope className="w-8 h-8" />}
+              title="مرشد العلاج الطبيعي"
+              description="الخطة السريرية والمكتبة والأدوات الدراسية صارت داخل التطبيق نفسه"
+              color="primary"
             />
           </div>
 
@@ -176,6 +182,12 @@ export default function Home() {
             title="الشات الذكي"
             description="احصل على اقتراحات ذكية مخصصة لبياناتك"
             color="accent"
+          />
+          <FeatureCard
+            icon={<Stethoscope className="w-8 h-8" />}
+            title="مرشد العلاج الطبيعي"
+            description="منصة موحدة للخطة التعليمية والمكتبة السريرية والمهام"
+            color="primary"
           />
         </div>
 

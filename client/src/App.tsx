@@ -12,6 +12,7 @@ import Habits from "./pages/Habits";
 import Sleep from "./pages/Sleep";
 import BrainDump from "./pages/BrainDump";
 import Chat from "./pages/Chat";
+import PhysioMaster from "./pages/PhysioMaster";
 import StudySchedule from "./pages/StudySchedule";
 
 function Router() {
@@ -30,6 +31,7 @@ function Router() {
           <Route path={"/sleep"} component={Sleep} />
           <Route path={"/brain-dump"} component={BrainDump} />
           <Route path={"/chat"} component={Chat} />
+          <Route path={"/physio-master"} component={PhysioMaster} />
           <Route path={"/study-schedule"} component={StudySchedule} />
           <Route path={"/404"} component={NotFound} />
           {/* Final fallback route */}

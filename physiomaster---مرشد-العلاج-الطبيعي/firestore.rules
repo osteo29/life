@@ -1,0 +1,139 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{uid}
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (optional)
+    //   - photoURL: string (optional, uri format)
+    //   - startDate: string (optional, date format)
+    //   - reminderEnabled: boolean (optional)
+    //   - reminderTime: string (optional)
+    //   - fcmToken: string (optional)
+    //   - assessmentChecklist: map (optional)
+    //   - notes: string (optional)
+    //   - darkMode: boolean (optional)
+    //   - waterReminder: boolean (optional)
+    //   - lastLogin: string (optional, date-time format)
+    //
+    // Collection: /users/{uid}/tasks/{taskId}
+    // Document ID: {taskId}
+    // Fields:
+    //   - id: string (required)
+    //   - uid: string (required, matches owner)
+    //   - text: string (required, max 500 chars)
+    //   - completed: boolean (required)
+    //   - date: string (required, date format)
+    //   - createdAt: string (required, date-time format)
+    //
+    // Collection: /users/{uid}/progress/{dayId}
+    // Document ID: {dayId}
+    // Fields:
+    //   - uid: string (required, matches owner)
+    //   - dayId: string (required)
+    //   - completed: boolean (required)
+    //   - updatedAt: string (required, date-time format)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDate(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    function isValidDateTime(dateTimeStr) {
+      return dateTimeStr is string && dateTimeStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      let allowedFields = [
+        'uid', 'email', 'displayName', 'photoURL', 'startDate', 
+        'reminderEnabled', 'reminderTime', 'fcmToken', 
+        'assessmentChecklist', 'notes', 'darkMode', 'waterReminder', 
+        'lastLogin'
+      ];
+      return hasOnlyAllowedFields(allowedFields) &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.email is string && isValidEmail(data.email) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('startDate' in data) || isValidDate(data.startDate)) &&
+             (!('reminderEnabled' in data) || data.reminderEnabled is bool) &&
+             (!('fcmToken' in data) || (data.fcmToken is string && data.fcmToken.size() < 500)) &&
+             (!('assessmentChecklist' in data) || data.assessmentChecklist is map) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 10000)) &&
+             (!('darkMode' in data) || data.darkMode is bool) &&
+             (!('waterReminder' in data) || data.waterReminder is bool);
+    }
+
+    function isValidTask(data) {
+      return hasOnlyAllowedFields(['id', 'uid', 'text', 'completed', 'date', 'createdAt']) &&
+             data.id is string &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 500 &&
+             data.completed is bool &&
+             isValidDate(data.date) &&
+             isValidDateTime(data.createdAt);
+    }
+
+    function isValidProgress(data) {
+      return hasOnlyAllowedFields(['uid', 'dayId', 'completed', 'updatedAt']) &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.dayId is string &&
+             data.completed is bool &&
+             isValidDateTime(data.updatedAt);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+
+      match /tasks/{taskId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTask(request.resource.data);
+        allow update: if isOwner(userId) && isValidTask(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /progress/{dayId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidProgress(request.resource.data);
+        allow update: if isOwner(userId) && isValidProgress(request.resource.data);
+      }
+    }
+  }
+}

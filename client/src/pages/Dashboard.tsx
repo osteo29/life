@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { BookOpen, Calendar, Moon, Zap, Brain, MessageSquare, TrendingUp } from "lucide-react";
+import { BookOpen, Calendar, Moon, Zap, Brain, MessageSquare, TrendingUp, Stethoscope } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { useLocation } from "wouter";
 
@@ -226,6 +226,23 @@ export default function Dashboard() {
                 <div>
                   <h3 className="font-semibold text-sm">الشات الذكي</h3>
                   <p className="text-xs text-muted-foreground">احصل على اقتراحات</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card 
+            className="card-elegant cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate("/physio-master")}
+          >
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Stethoscope className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm">مرشد العلاج الطبيعي</h3>
+                  <p className="text-xs text-muted-foreground">الخطة السريرية المدمجة</p>
                 </div>
               </div>
             </CardContent>

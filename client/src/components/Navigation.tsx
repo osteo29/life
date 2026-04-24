@@ -9,6 +9,7 @@ import {
   Brain, 
   MessageSquare, 
   Calendar,
+  Stethoscope,
   LogOut,
   Menu,
   X
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/brain-dump", label: "تفريغ الأفكار", icon: Brain },
   { href: "/study-schedule", label: "جدول المراجعة", icon: Calendar },
   { href: "/chat", label: "الشات الذكي", icon: MessageSquare },
+  { href: "/physio-master", label: "مرشد العلاج الطبيعي", icon: Stethoscope },
 ];
 
 export default function Navigation() {
