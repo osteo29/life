@@ -9,8 +9,8 @@ import {
   Calendar 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '../../lib/utils';
-import { Task } from '../../types';
+import { cn } from '@/lib/utils';
+import type { Task } from '../types';
 
 interface TasksTabProps {
   newTask: string;

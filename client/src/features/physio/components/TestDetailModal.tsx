@@ -7,7 +7,7 @@ import {
   CheckCircle2 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SpecialTest } from '../../types';
+import type { SpecialTest } from '../types';
 
 interface TestDetailModalProps {
   test: SpecialTest | null;

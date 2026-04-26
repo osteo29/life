@@ -10,9 +10,9 @@ import {
   ArrowRightLeft 
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { cn } from '../../lib/utils';
-import { ORTHO_LIBRARY, ROM_REFERENCE, TELEGRAM_CATEGORIES, SPECIAL_TESTS } from '../../constants';
-import { SpecialTest } from '../../types';
+import { cn } from '@/lib/utils';
+import { ORTHO_LIBRARY, ROM_REFERENCE, TELEGRAM_CATEGORIES, SPECIAL_TESTS } from '../constants';
+import type { SpecialTest } from '../types';
 
 interface LibraryTabProps {
   searchQuery: string;

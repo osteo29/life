@@ -1,16 +1,15 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { BottomNav } from "@physio/components/layout/BottomNav";
-import { TestDetailModal } from "@physio/components/modals/TestDetailModal";
-import { DailyTab } from "@physio/components/tabs/DailyTab";
-import { LibraryTab } from "@physio/components/tabs/LibraryTab";
-import { RoadmapTab } from "@physio/components/tabs/RoadmapTab";
-import { TasksTab } from "@physio/components/tabs/TasksTab";
-import { MONTHS_PLAN } from "@physio/constants/curriculum";
-import type { SpecialTest } from "@physio/types";
+import { TestDetailModal } from "@/features/physio/components/TestDetailModal";
+import { PhysioTabNav, type PhysioTab } from "@/features/physio/components/PhysioTabNav";
+import { DailyTab } from "@/features/physio/tabs/DailyTab";
+import { LibraryTab } from "@/features/physio/tabs/LibraryTab";
+import { RoadmapTab } from "@/features/physio/tabs/RoadmapTab";
+import { TasksTab } from "@/features/physio/tabs/TasksTab";
+import { MONTHS_PLAN } from "@/features/physio/constants/curriculum";
+import type { SpecialTest } from "@/features/physio/types";
 import {
   ArrowLeft,
-  Bell,
   Bot,
   Calendar,
   CheckCircle2,
@@ -19,11 +18,11 @@ import {
   Moon,
   Sparkles,
   Sun,
+  Bell,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocation } from "wouter";
 
-type Tab = "daily" | "roadmap" | "ai" | "tasks" | "library" | "settings";
 type Task = { id: string; text: string; completed: boolean };
 
 const TOPICS = [
@@ -55,7 +54,7 @@ const read = <T,>(key: string, fallback: T): T => {
 export default function PhysioMaster() {
   const { user, logout } = useAuth({ redirectOnUnauthenticated: true });
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<Tab>(() => read("physio.tab", "daily"));
+  const [activeTab, setActiveTab] = useState<PhysioTab>(() => read("physio.tab", "daily"));
   const [tasks, setTasks] = useState<Task[]>(() => read("physio.tasks", []));
   const [newTask, setNewTask] = useState("");
   const [notes, setNotes] = useState(() => read("physio.notes", ""));
@@ -81,6 +80,7 @@ export default function PhysioMaster() {
   const [pomoActive, setPomoActive] = useState(false);
   const [pomoMode, setPomoMode] = useState<"work" | "break">("work");
 
+  // Persist state to localStorage
   useEffect(() => {
     const values: Array<[string, unknown]> = [
       ["physio.tab", activeTab],
@@ -98,9 +98,9 @@ export default function PhysioMaster() {
       ["physio.topicIndex", topicIndex],
     ];
     values.forEach(([key, value]) => window.localStorage.setItem(key, JSON.stringify(value)));
-    document.documentElement.classList.toggle("dark", darkMode);
   }, [activeTab, assessmentChecklist, completedDays, dailyReminder, darkMode, notes, reasoningData, selectedMonth, selectedPhase, startDate, tasks, topicIndex, waterReminder]);
 
+  // Pomodoro timer
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
     if (pomoActive && pomoTime > 0) {
@@ -160,68 +160,118 @@ export default function PhysioMaster() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 dark:bg-slate-950">
-      <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/85 px-6 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/85">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-          <Button variant="ghost" onClick={() => navigate("/dashboard")} className="gap-2 rounded-2xl"><ArrowLeft className="h-4 w-4" />رجوع</Button>
-          <div className="flex items-center gap-3 text-right">
-            <div>
-              <h1 className="text-xl font-black text-slate-900 dark:text-white">مرشد العلاج الطبيعي</h1>
-              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-600 dark:text-blue-400">Integrated Workspace</p>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/5 md:pt-0 pt-16">
+      {/* Header */}
+      <div className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-16 md:top-0 z-30">
+        <div className="container py-4">
+          <div className="flex items-center justify-between gap-4">
+            <Button variant="ghost" onClick={() => navigate("/dashboard")} className="gap-2 rounded-2xl">
+              <ArrowLeft className="h-4 w-4" />رجوع
+            </Button>
+            <div className="flex items-center gap-3 text-right">
+              <div>
+                <h1 className="text-xl font-black text-foreground">مرشد العلاج الطبيعي</h1>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary">Clinical Excellence</p>
+              </div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
+                <Sparkles size={20} />
+              </div>
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white"><Sparkles size={22} /></div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="mx-auto max-w-5xl p-6">
-        <div className="mb-6 rounded-[2rem] border border-blue-100 bg-gradient-to-r from-blue-50 via-cyan-50 to-emerald-50 p-5 text-right dark:border-blue-900/30 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
-          <p className="text-xs font-black uppercase tracking-[0.25em] text-blue-600 dark:text-blue-400">دمج كامل</p>
-          <h2 className="mt-1 text-2xl font-black text-slate-900 dark:text-white">كل مزايا العلاج الطبيعي أصبحت داخل التطبيق الحالي</h2>
-          <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">الخطة التعليمية، المكتبة السريرية، المهام، والإعدادات الخاصة بمرشد العلاج الطبيعي أصبحت جزءًا من المشروع الرئيسي مع حفظ محلي مباشر.</p>
+      {/* Tab Navigation */}
+      <div className="container pt-5 pb-2">
+        <PhysioTabNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      </div>
+
+      {/* Content */}
+      <main className="container pb-12">
+        <div className="mx-auto max-w-5xl space-y-6 pt-4">
+          {activeTab === "daily" && (
+            <DailyTab pomoMode={pomoMode} pomoTime={pomoTime} pomoActive={pomoActive} setPomoActive={setPomoActive} setPomoTime={setPomoTime} formatPomoTime={formatPomoTime} startDate={startDate} dayInfo={dayInfo} setActiveTab={setActiveTab} loadingTopic={loadingTopic} dailyTopic={dailyTopic} handleGenerateQuiz={handleGenerateQuiz} loadingQuiz={loadingQuiz} quiz={quiz} setQuiz={setQuiz} fetchDailyTopic={fetchDailyTopic} showReasoningBuilder={showReasoningBuilder} setShowReasoningBuilder={setShowReasoningBuilder} reasoningData={reasoningData} setReasoningData={setReasoningData} assessmentChecklist={assessmentChecklist} setAssessmentChecklist={setAssessmentChecklist} />
+          )}
+          {activeTab === "roadmap" && (
+            <RoadmapTab selectedPhase={selectedPhase} setSelectedPhase={setSelectedPhase} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} completedDays={completedDays} toggleDayCompletion={toggleCurriculumTask} />
+          )}
+          {activeTab === "tasks" && (
+            <TasksTab newTask={newTask} setNewTask={setNewTask} addTask={addTask} tasks={tasks} toggleTask={toggleTask} deleteTask={deleteTask} notes={notes} setNotes={setNotes} />
+          )}
+          {activeTab === "library" && (
+            <LibraryTab searchQuery={searchQuery} setSearchQuery={setSearchQuery} bmi={bmi} setBmi={setBmi} calculateBMI={calculateBMI} setSelectedTest={setSelectedTest} />
+          )}
+
+          {/* AI Consultant Tab - Inline */}
+          {activeTab === "ai" && (
+            <div className="space-y-6">
+              <div className="rounded-[2rem] bg-gradient-to-br from-blue-600 via-cyan-600 to-emerald-600 p-6 text-right text-white shadow-xl">
+                <div className="mb-3 flex items-center justify-between">
+                  <a href="https://physionutrition.vercel.app/ar/insights" target="_blank" rel="noreferrer" className="rounded-2xl bg-white/15 p-3 hover:bg-white/25 transition-colors"><ExternalLink size={18} /></a>
+                  <div className="flex items-center gap-3"><Bot size={24} /><h3 className="text-2xl font-black">مركز الاستشارة الذكية</h3></div>
+                </div>
+                <p className="leading-7 text-cyan-50">استخدم الشات الذكي الحالي بالمشروع مع prompts سريرية، واستفد من روابط التغذية العلاجية ومكتبة الإصابات في نفس المكان.</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <a href="/chat" className="rounded-[2rem] border border-border bg-card p-5 text-right shadow-sm hover:shadow-md transition-shadow">
+                  <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-primary">AI</p>
+                  <h4 className="font-black text-foreground">افتح الشات الذكي</h4>
+                  <p className="text-sm text-muted-foreground">للنقاش السريري وصياغة أسئلة مذاكرة.</p>
+                </a>
+                <a href="https://physionutrition.vercel.app/ar/calculators" target="_blank" rel="noreferrer" className="rounded-[2rem] border border-border bg-card p-5 text-right shadow-sm hover:shadow-md transition-shadow">
+                  <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-emerald-600">Nutrition</p>
+                  <h4 className="font-black text-foreground">حاسبات التغذية</h4>
+                  <p className="text-sm text-muted-foreground">BMI وCalories وMacros.</p>
+                </a>
+                <a href="https://physionutrition.vercel.app/ar/injuries" target="_blank" rel="noreferrer" className="rounded-[2rem] border border-border bg-card p-5 text-right shadow-sm hover:shadow-md transition-shadow">
+                  <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-cyan-600">Library</p>
+                  <h4 className="font-black text-foreground">مكتبة الإصابات</h4>
+                  <p className="text-sm text-muted-foreground">بروتوكولات وتعافي مبني على الأدلة.</p>
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Settings Tab - Inline */}
+          {activeTab === "settings" && (
+            <div className="space-y-4">
+              <div className="rounded-[2rem] border border-border bg-card p-6 text-right shadow-sm">
+                <h3 className="mb-4 text-xl font-black text-foreground">{user?.name || "الطالب"}</h3>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <label className="rounded-2xl border border-border bg-muted/30 p-4">
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">بداية الخطة <Calendar size={14} /></span>
+                    <input type="date" value={startDate ?? ""} onChange={(event) => setStartDate(event.target.value || null)} className="w-full rounded-xl border border-border bg-card px-3 py-2 text-right text-sm outline-none" />
+                  </label>
+                  <button onClick={() => setDailyReminder((value) => !value)} className="rounded-2xl border border-border bg-muted/30 p-4 text-right">
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">تنبيه الدراسة <Bell size={14} /></span>
+                    <p className="text-sm font-bold text-foreground">{dailyReminder ? "مفعل ✅" : "متوقف"}</p>
+                  </button>
+                  <button onClick={() => setWaterReminder((value) => !value)} className="rounded-2xl border border-border bg-muted/30 p-4 text-right">
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">شرب الماء <Droplets size={14} /></span>
+                    <p className="text-sm font-bold text-foreground">{waterReminder ? "مفعل ✅" : "متوقف"}</p>
+                  </button>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <button onClick={() => setDarkMode((value) => !value)} className="rounded-2xl border border-border bg-muted/30 p-4 text-right">
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">الوضع الليلي {darkMode ? <Moon size={14} /> : <Sun size={14} />}</span>
+                    <p className="text-sm font-bold text-foreground">{darkMode ? "مفعل" : "نهاري"}</p>
+                  </button>
+                  <div className="rounded-2xl border border-border bg-muted/30 p-4 text-right">
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">أيام مكتملة <Calendar size={14} /></span>
+                    <p className="text-sm font-bold text-foreground">{completedDays.length}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-muted/30 p-4 text-right">
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">مهام منجزة <CheckCircle2 size={14} /></span>
+                    <p className="text-sm font-bold text-foreground">{tasks.filter((task) => task.completed).length}</p>
+                  </div>
+                </div>
+                <Button onClick={() => void logout()} variant="outline" className="mt-4 w-full rounded-2xl">تسجيل الخروج</Button>
+              </div>
+            </div>
+          )}
         </div>
-
-        {activeTab === "daily" && <DailyTab pomoMode={pomoMode} pomoTime={pomoTime} pomoActive={pomoActive} setPomoActive={setPomoActive} setPomoTime={setPomoTime} formatPomoTime={formatPomoTime} startDate={startDate} dayInfo={dayInfo} setActiveTab={setActiveTab} loadingTopic={loadingTopic} dailyTopic={dailyTopic} handleGenerateQuiz={handleGenerateQuiz} loadingQuiz={loadingQuiz} quiz={quiz} setQuiz={setQuiz} fetchDailyTopic={fetchDailyTopic} showReasoningBuilder={showReasoningBuilder} setShowReasoningBuilder={setShowReasoningBuilder} reasoningData={reasoningData} setReasoningData={setReasoningData} assessmentChecklist={assessmentChecklist} setAssessmentChecklist={setAssessmentChecklist} />}
-        {activeTab === "roadmap" && <RoadmapTab selectedPhase={selectedPhase} setSelectedPhase={setSelectedPhase} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} completedDays={completedDays} toggleDayCompletion={toggleCurriculumTask} />}
-        {activeTab === "tasks" && <TasksTab newTask={newTask} setNewTask={setNewTask} addTask={addTask} tasks={tasks} toggleTask={toggleTask} deleteTask={deleteTask} notes={notes} setNotes={setNotes} />}
-        {activeTab === "library" && <LibraryTab searchQuery={searchQuery} setSearchQuery={setSearchQuery} bmi={bmi} setBmi={setBmi} calculateBMI={calculateBMI} setSelectedTest={setSelectedTest} />}
-        {activeTab === "ai" && (
-          <div className="space-y-6 pb-24">
-            <div className="rounded-[2rem] bg-gradient-to-br from-blue-600 via-cyan-600 to-emerald-600 p-6 text-right text-white shadow-xl">
-              <div className="mb-3 flex items-center justify-between">
-                <a href="https://physionutrition.vercel.app/ar/insights" target="_blank" rel="noreferrer" className="rounded-2xl bg-white/15 p-3"><ExternalLink size={18} /></a>
-                <div className="flex items-center gap-3"><Bot size={24} /><h3 className="text-2xl font-black">مركز الاستشارة الذكية</h3></div>
-              </div>
-              <p className="leading-7 text-cyan-50">استخدم الشات الذكي الحالي بالمشروع مع prompts سريرية، واستفد من روابط التغذية العلاجية ومكتبة الإصابات في نفس المكان.</p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              <a href="/chat" className="rounded-[2rem] border border-slate-100 bg-white p-5 text-right shadow-sm dark:border-slate-800 dark:bg-slate-900"><p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-blue-600">AI</p><h4 className="font-black text-slate-800 dark:text-slate-100">افتح الشات الذكي</h4><p className="text-sm text-slate-500 dark:text-slate-400">للنقاش السريري وصياغة أسئلة مذاكرة.</p></a>
-              <a href="https://physionutrition.vercel.app/ar/calculators" target="_blank" rel="noreferrer" className="rounded-[2rem] border border-slate-100 bg-white p-5 text-right shadow-sm dark:border-slate-800 dark:bg-slate-900"><p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-emerald-600">Nutrition</p><h4 className="font-black text-slate-800 dark:text-slate-100">حاسبات التغذية</h4><p className="text-sm text-slate-500 dark:text-slate-400">BMI وCalories وMacros.</p></a>
-              <a href="https://physionutrition.vercel.app/ar/injuries" target="_blank" rel="noreferrer" className="rounded-[2rem] border border-slate-100 bg-white p-5 text-right shadow-sm dark:border-slate-800 dark:bg-slate-900"><p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-cyan-600">Library</p><h4 className="font-black text-slate-800 dark:text-slate-100">مكتبة الإصابات</h4><p className="text-sm text-slate-500 dark:text-slate-400">بروتوكولات وتعافي مبني على الأدلة.</p></a>
-            </div>
-          </div>
-        )}
-        {activeTab === "settings" && (
-          <div className="space-y-4 pb-24">
-            <div className="rounded-[2rem] border border-slate-100 bg-white p-6 text-right shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="mb-4 text-xl font-black text-slate-900 dark:text-white">{user?.name || "الطالب"}</h3>
-              <div className="grid gap-3 md:grid-cols-3">
-                <label className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"><span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-slate-400">بداية الخطة <Calendar size={14} /></span><input type="date" value={startDate ?? ""} onChange={(event) => setStartDate(event.target.value || null)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-right text-sm outline-none dark:border-slate-700 dark:bg-slate-900" /></label>
-                <button onClick={() => setDailyReminder((value) => !value)} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"><span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-slate-400">تنبيه الدراسة <Bell size={14} /></span><p className="text-sm font-bold text-slate-700 dark:text-slate-200">{dailyReminder ? "مفعل" : "متوقف"}</p></button>
-                <button onClick={() => setWaterReminder((value) => !value)} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"><span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-slate-400">شرب الماء <Droplets size={14} /></span><p className="text-sm font-bold text-slate-700 dark:text-slate-200">{waterReminder ? "مفعل" : "متوقف"}</p></button>
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <button onClick={() => setDarkMode((value) => !value)} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"><span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-slate-400">الوضع الليلي {darkMode ? <Moon size={14} /> : <Sun size={14} />}</span><p className="text-sm font-bold text-slate-700 dark:text-slate-200">{darkMode ? "مفعل" : "نهاري"}</p></button>
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"><span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-slate-400">أيام مكتملة <Calendar size={14} /></span><p className="text-sm font-bold text-slate-700 dark:text-slate-200">{completedDays.length}</p></div>
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"><span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-slate-400">مهام منجزة <CheckCircle2 size={14} /></span><p className="text-sm font-bold text-slate-700 dark:text-slate-200">{tasks.filter((task) => task.completed).length}</p></div>
-              </div>
-              <Button onClick={() => void logout()} variant="outline" className="mt-4 w-full rounded-2xl">تسجيل الخروج</Button>
-            </div>
-          </div>
-        )}
       </main>
 
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       <TestDetailModal test={selectedTest} onClose={() => setSelectedTest(null)} />
     </div>
   );

@@ -7,7 +7,7 @@ import {
   Sparkles,
   Calculator
 } from 'lucide-react';
-import { Phase, SpecialTestCategory, OrthoLibraryCategory, ROMReference, TelegramResource, TelegramCategory } from '../types';
+import type { Phase, SpecialTestCategory, OrthoLibraryCategory, ROMReference, TelegramResource, TelegramCategory } from '../types';
 
 export const PHASES: Phase[] = [
   {

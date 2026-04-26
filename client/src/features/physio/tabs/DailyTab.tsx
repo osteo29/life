@@ -15,8 +15,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Streamdown } from 'streamdown';
-import { cn } from '../../lib/utils';
-import { TELEGRAM_RESOURCES } from '../../constants';
+import { cn } from '@/lib/utils';
+import { TELEGRAM_RESOURCES } from '../constants';
 
 interface DailyTabProps {
   pomoMode: 'work' | 'break';

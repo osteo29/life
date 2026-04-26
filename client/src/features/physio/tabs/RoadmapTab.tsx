@@ -10,9 +10,9 @@ import {
   Target 
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { cn } from '../../lib/utils';
-import { PHASES } from '../../constants';
-import { MONTHS_PLAN } from '../../constants/curriculum';
+import { cn } from '@/lib/utils';
+import { PHASES } from '../constants';
+import { MONTHS_PLAN } from '../constants/curriculum';
 
 interface RoadmapTabProps {
   selectedPhase: string;
