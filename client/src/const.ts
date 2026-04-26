@@ -7,11 +7,25 @@ export const getLoginUrl = () => {
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
   const state = btoa(redirectUri);
 
-  const url = new URL(`${oauthPortalUrl}/app-auth`);
-  url.searchParams.set("appId", appId);
-  url.searchParams.set("redirectUri", redirectUri);
-  url.searchParams.set("state", state);
-  url.searchParams.set("type", "signIn");
+  if (!oauthPortalUrl || !appId) {
+    console.error(
+      "[Auth] Missing VITE_OAUTH_PORTAL_URL or VITE_APP_ID. Falling back to home."
+    );
+    return "/";
+  }
 
-  return url.toString();
+  try {
+    const baseUrl = oauthPortalUrl.startsWith("http")
+      ? oauthPortalUrl
+      : `https://${oauthPortalUrl}`;
+    const url = new URL("/app-auth", baseUrl);
+    url.searchParams.set("appId", appId);
+    url.searchParams.set("redirectUri", redirectUri);
+    url.searchParams.set("state", state);
+    url.searchParams.set("type", "signIn");
+    return url.toString();
+  } catch (error) {
+    console.error("[Auth] Invalid OAuth portal URL configuration.", error);
+    return "/";
+  }
 };
