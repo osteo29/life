@@ -17,6 +17,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Streamdown } from 'streamdown';
 import { cn } from '@/lib/utils';
 import { TELEGRAM_RESOURCES } from '../constants';
+import type { PhysioTab } from '../components/PhysioTabNav';
+
+type ReasoningData = {
+  pain: string;
+  movement: string;
+  muscle: string;
+  joint: string;
+  diagnosis: string;
+};
 
 interface DailyTabProps {
   pomoMode: 'work' | 'break';
@@ -27,7 +36,7 @@ interface DailyTabProps {
   formatPomoTime: (time: number) => string;
   startDate: string | null;
   dayInfo: any;
-  setActiveTab: (tab: any) => void;
+  setActiveTab: (tab: PhysioTab) => void;
   loadingTopic: boolean;
   dailyTopic: string | null;
   handleGenerateQuiz: () => void;
@@ -37,10 +46,10 @@ interface DailyTabProps {
   fetchDailyTopic: () => void;
   showReasoningBuilder: boolean;
   setShowReasoningBuilder: (show: boolean) => void;
-  reasoningData: any;
-  setReasoningData: (data: any) => void;
+  reasoningData: ReasoningData;
+  setReasoningData: React.Dispatch<React.SetStateAction<ReasoningData>>;
   assessmentChecklist: Record<string, boolean>;
-  setAssessmentChecklist: (checklist: any) => void;
+  setAssessmentChecklist: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
 export function DailyTab({

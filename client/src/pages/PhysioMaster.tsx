@@ -1,15 +1,23 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { TestDetailModal } from "@/features/physio/components/TestDetailModal";
-import { PhysioTabNav, type PhysioTab } from "@/features/physio/components/PhysioTabNav";
+import { MONTHS_PLAN } from "@/features/physio/constants/curriculum";
+import {
+  PhysioTabNav,
+  type PhysioTab,
+} from "@/features/physio/components/PhysioTabNav";
+import {
+  ensureNotificationPermission,
+  sendBrowserNotification,
+} from "@/features/physio/lib/notifications";
 import { DailyTab } from "@/features/physio/tabs/DailyTab";
 import { LibraryTab } from "@/features/physio/tabs/LibraryTab";
 import { RoadmapTab } from "@/features/physio/tabs/RoadmapTab";
 import { TasksTab } from "@/features/physio/tabs/TasksTab";
-import { MONTHS_PLAN } from "@/features/physio/constants/curriculum";
 import type { SpecialTest } from "@/features/physio/types";
 import {
   ArrowLeft,
+  Bell,
   Bot,
   Calendar,
   CheckCircle2,
@@ -18,25 +26,69 @@ import {
   Moon,
   Sparkles,
   Sun,
-  Bell,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocation } from "wouter";
 
 type Task = { id: string; text: string; completed: boolean };
 
+type ReasoningState = {
+  pain: string;
+  movement: string;
+  muscle: string;
+  joint: string;
+  diagnosis: string;
+};
+
 const TOPICS = [
   {
-    body: "## حالة اليوم\nإصابة ACL بعد تغيير اتجاه سريع.\n\n- راجع التاريخ المرضي والتورم السريع.\n- فرّق بين الفحص الحاد والفحص بعد هدوء الألم.\n- ضع أهداف أول أسبوعين من التأهيل.",
-    quiz: "## اختبار سريع\n1. ما الاختبار الأشهر لـ ACL؟\n- A) Lachman\n- B) FABER\n- C) Speed's\n\n2. ما الأولوية المبكرة؟\n- A) تهدئة الألم والتورم\n- B) قفزات قوية",
+    body: `## حالة اليوم
+إصابة ACL بعد تغيير اتجاه سريع.
+
+- راجع التاريخ المرضي والتورم السريع.
+- فرّق بين الفحص الحاد والفحص بعد هدوء الألم.
+- ضع أهداف أول أسبوعين من التأهيل.`,
+    quiz: `## اختبار سريع
+1. ما الاختبار الأشهر لـ ACL؟
+- A) Lachman
+- B) FABER
+- C) Speed's
+
+2. ما الأولوية المبكرة؟
+- A) تهدئة الألم والتورم
+- B) قفزات قوية`,
   },
   {
-    body: "## موضوع اليوم\nShoulder impingement مع painful arc.\n\n- اربط الأعراض بحركة اللوح scapula.\n- راجع دور rotator cuff.\n- حدّد ماذا ستعدّل في نمط الحركة.",
-    quiz: "## راجع معلوماتك\n1. painful arc يرتبط غالبًا بـ:\n- A) shoulder elevation\n- B) ankle dorsiflexion\n\n2. أحد أهداف العلاج المبكر:\n- A) تحسين ميكانيكا الحركة\n- B) تجاهل الألم",
+    body: `## موضوع اليوم
+Shoulder impingement مع painful arc.
+
+- اربط الأعراض بحركة لوح الكتف scapula.
+- راجع دور rotator cuff.
+- حدّد ما الذي ستعدّله في نمط الحركة.`,
+    quiz: `## راجع معلوماتك
+1. painful arc يرتبط غالبًا بـ:
+- A) shoulder elevation
+- B) ankle dorsiflexion
+
+2. أحد أهداف العلاج المبكر:
+- A) تحسين ميكانيكا الحركة
+- B) تجاهل الألم`,
   },
   {
-    body: "## حالة سريرية\nألم أسفل الظهر ممتد أسفل الركبة.\n\n- افحص توزع الألم.\n- راجع SLR وred flags.\n- فرّق بين irritation عصبي ومشكلة عضلية بسيطة.",
-    quiz: "## أسئلة قصيرة\n1. امتداد الألم أسفل الركبة قد يشير إلى:\n- A) nerve irritation\n- B) ألم موضعي فقط\n\n2. خطوة البداية:\n- A) جمع التاريخ المرضي\n- B) تخمين التشخيص مباشرة",
+    body: `## حالة سريرية
+ألم أسفل الظهر ممتد أسفل الركبة.
+
+- افحص توزيع الألم.
+- راجع SLR وred flags.
+- فرّق بين irritation عصبي ومشكلة عضلية بسيطة.`,
+    quiz: `## أسئلة قصيرة
+1. امتداد الألم أسفل الركبة قد يشير إلى:
+- A) nerve irritation
+- B) ألم موضعي فقط
+
+2. خطوة البداية:
+- A) جمع التاريخ المرضي
+- B) تخمين التشخيص مباشرة`,
   },
 ];
 
@@ -54,25 +106,59 @@ const read = <T,>(key: string, fallback: T): T => {
 export default function PhysioMaster() {
   const { user, logout } = useAuth({ redirectOnUnauthenticated: true });
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<PhysioTab>(() => read("physio.tab", "daily"));
+  const [activeTab, setActiveTab] = useState<PhysioTab>(() =>
+    read("physio.tab", "daily"),
+  );
   const [tasks, setTasks] = useState<Task[]>(() => read("physio.tasks", []));
   const [newTask, setNewTask] = useState("");
   const [notes, setNotes] = useState(() => read("physio.notes", ""));
-  const [startDate, setStartDate] = useState<string | null>(() => read("physio.startDate", null));
-  const [selectedPhase, setSelectedPhase] = useState(() => read("physio.phase", "p1"));
-  const [selectedMonth, setSelectedMonth] = useState(() => read("physio.month", 0));
-  const [completedDays, setCompletedDays] = useState<string[]>(() => read("physio.completed", []));
-  const [darkMode, setDarkMode] = useState(() => read("physio.darkMode", false));
-  const [dailyReminder, setDailyReminder] = useState(() => read("physio.dailyReminder", false));
-  const [waterReminder, setWaterReminder] = useState(() => read("physio.waterReminder", false));
-  const [reasoningData, setReasoningData] = useState(() => read("physio.reasoning", { pain: "", movement: "", muscle: "", joint: "", diagnosis: "" }));
-  const [assessmentChecklist, setAssessmentChecklist] = useState<Record<string, boolean>>(() => read("physio.assessment", {}));
+  const [startDate, setStartDate] = useState<string | null>(() =>
+    read("physio.startDate", null),
+  );
+  const [selectedPhase, setSelectedPhase] = useState(() =>
+    read("physio.phase", "p1"),
+  );
+  const [selectedMonth, setSelectedMonth] = useState(() =>
+    read("physio.month", 0),
+  );
+  const [completedDays, setCompletedDays] = useState<string[]>(() =>
+    read("physio.completed", []),
+  );
+  const [darkMode, setDarkMode] = useState(() =>
+    read("physio.darkMode", false),
+  );
+  const [dailyReminder, setDailyReminder] = useState(() =>
+    read("physio.dailyReminder", false),
+  );
+  const [waterReminder, setWaterReminder] = useState(() =>
+    read("physio.waterReminder", false),
+  );
+  const [reasoningData, setReasoningData] = useState<ReasoningState>(() =>
+    read("physio.reasoning", {
+      pain: "",
+      movement: "",
+      muscle: "",
+      joint: "",
+      diagnosis: "",
+    }),
+  );
+  const [assessmentChecklist, setAssessmentChecklist] = useState<
+    Record<string, boolean>
+  >(() => read("physio.assessment", {}));
   const [showReasoningBuilder, setShowReasoningBuilder] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTest, setSelectedTest] = useState<SpecialTest | null>(null);
-  const [bmi, setBmi] = useState({ weight: "", height: "", result: null as number | null });
-  const [topicIndex, setTopicIndex] = useState(() => read("physio.topicIndex", 0));
-  const [dailyTopic, setDailyTopic] = useState<string | null>(TOPICS[read("physio.topicIndex", 0)]?.body ?? TOPICS[0].body);
+  const [bmi, setBmi] = useState({
+    weight: "",
+    height: "",
+    result: null as number | null,
+  });
+  const [topicIndex, setTopicIndex] = useState(() =>
+    read("physio.topicIndex", 0),
+  );
+  const [dailyTopic, setDailyTopic] = useState<string | null>(
+    TOPICS[read("physio.topicIndex", 0)]?.body ?? TOPICS[0].body,
+  );
   const [quiz, setQuiz] = useState<string | null>(null);
   const [loadingTopic, setLoadingTopic] = useState(false);
   const [loadingQuiz, setLoadingQuiz] = useState(false);
@@ -80,7 +166,6 @@ export default function PhysioMaster() {
   const [pomoActive, setPomoActive] = useState(false);
   const [pomoMode, setPomoMode] = useState<"work" | "break">("work");
 
-  // Persist state to localStorage
   useEffect(() => {
     const values: Array<[string, unknown]> = [
       ["physio.tab", activeTab],
@@ -97,10 +182,51 @@ export default function PhysioMaster() {
       ["physio.assessment", assessmentChecklist],
       ["physio.topicIndex", topicIndex],
     ];
-    values.forEach(([key, value]) => window.localStorage.setItem(key, JSON.stringify(value)));
-  }, [activeTab, assessmentChecklist, completedDays, dailyReminder, darkMode, notes, reasoningData, selectedMonth, selectedPhase, startDate, tasks, topicIndex, waterReminder]);
+    values.forEach(([key, value]) =>
+      window.localStorage.setItem(key, JSON.stringify(value)),
+    );
+  }, [
+    activeTab,
+    assessmentChecklist,
+    completedDays,
+    dailyReminder,
+    darkMode,
+    notes,
+    reasoningData,
+    selectedMonth,
+    selectedPhase,
+    startDate,
+    tasks,
+    topicIndex,
+    waterReminder,
+  ]);
 
-  // Pomodoro timer
+  useEffect(() => {
+    if (!dailyReminder) return;
+
+    void ensureNotificationPermission();
+    const interval = window.setInterval(() => {
+      void sendBrowserNotification("موعد مراجعة PhysioMaster", {
+        body: "راجع خطة اليوم أو افتح وضع الاستشاري السريع.",
+      });
+    }, 24 * 60 * 60 * 1000);
+
+    return () => window.clearInterval(interval);
+  }, [dailyReminder]);
+
+  useEffect(() => {
+    if (!waterReminder) return;
+
+    void ensureNotificationPermission();
+    const interval = window.setInterval(() => {
+      void sendBrowserNotification("اشرب ماء", {
+        body: "حافظ على ترطيبك خلال جلسات المذاكرة الطويلة.",
+      });
+    }, 2 * 60 * 60 * 1000);
+
+    return () => window.clearInterval(interval);
+  }, [waterReminder]);
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
     if (pomoActive && pomoTime > 0) {
@@ -116,8 +242,11 @@ export default function PhysioMaster() {
 
   const dayInfo = useMemo(() => {
     if (!startDate) return null;
-    const diffDays = Math.floor(Math.abs(Date.now() - new Date(startDate).getTime()) / 86400000);
-    const month = MONTHS_PLAN[Math.min(MONTHS_PLAN.length - 1, Math.floor(diffDays / 30))];
+    const diffDays = Math.floor(
+      Math.abs(Date.now() - new Date(startDate).getTime()) / 86400000,
+    );
+    const month =
+      MONTHS_PLAN[Math.min(MONTHS_PLAN.length - 1, Math.floor(diffDays / 30))];
     const week = month?.weeks[Math.floor((diffDays % 30) / 7)];
     const day = week?.days[diffDays % 7];
     return { month, week, day, diffDays };
@@ -127,19 +256,37 @@ export default function PhysioMaster() {
     event.preventDefault();
     const value = newTask.trim();
     if (!value) return;
-    setTasks((current) => [{ id: `${Date.now()}`, text: value, completed: false }, ...current]);
+    setTasks((current) => [
+      { id: `${Date.now()}`, text: value, completed: false },
+      ...current,
+    ]);
     setNewTask("");
   };
 
-  const toggleTask = (id: string) => setTasks((current) => current.map((task) => task.id === id ? { ...task, completed: !task.completed } : task));
-  const deleteTask = (id: string) => setTasks((current) => current.filter((task) => task.id !== id));
-  const toggleCurriculumTask = (id: string) => setCompletedDays((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-  const formatPomoTime = (seconds: number) => `${`${Math.floor(seconds / 60)}`.padStart(2, "0")}:${`${seconds % 60}`.padStart(2, "0")}`;
+  const toggleTask = (id: string) =>
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === id ? { ...task, completed: !task.completed } : task,
+      ),
+    );
+  const deleteTask = (id: string) =>
+    setTasks((current) => current.filter((task) => task.id !== id));
+  const toggleCurriculumTask = (id: string) =>
+    setCompletedDays((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+  const formatPomoTime = (seconds: number) =>
+    `${`${Math.floor(seconds / 60)}`.padStart(2, "0")}:${`${seconds % 60}`.padStart(2, "0")}`;
   const calculateBMI = () => {
     const weight = Number.parseFloat(bmi.weight);
     const height = Number.parseFloat(bmi.height) / 100;
     if (!weight || !height) return;
-    setBmi((current) => ({ ...current, result: Number.parseFloat((weight / (height * height)).toFixed(1)) }));
+    setBmi((current) => ({
+      ...current,
+      result: Number.parseFloat((weight / (height * height)).toFixed(1)),
+    }));
   };
   const fetchDailyTopic = () => {
     setLoadingTopic(true);
@@ -158,20 +305,45 @@ export default function PhysioMaster() {
       setLoadingQuiz(false);
     }, 250);
   };
+  const toggleDailyReminder = async () => {
+    if (!dailyReminder) {
+      await ensureNotificationPermission();
+    }
+    setDailyReminder((value) => !value);
+  };
+  const toggleWaterReminder = async () => {
+    if (!waterReminder) {
+      await ensureNotificationPermission();
+    }
+    setWaterReminder((value) => !value);
+  };
+  const sendTestNotification = async () => {
+    await sendBrowserNotification("اختبار الإشعارات", {
+      body: "الإشعارات المحلية داخل PhysioMaster تعمل بشكل سليم.",
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/5 md:pt-0 pt-16">
-      {/* Header */}
-      <div className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-16 md:top-0 z-30">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/5 pt-16 md:pt-0">
+      <div className="sticky top-16 z-30 border-b border-border/50 bg-card/50 backdrop-blur-xl md:top-0">
         <div className="container py-4">
           <div className="flex items-center justify-between gap-4">
-            <Button variant="ghost" onClick={() => navigate("/dashboard")} className="gap-2 rounded-2xl">
-              <ArrowLeft className="h-4 w-4" />رجوع
+            <Button
+              variant="ghost"
+              onClick={() => navigate("/dashboard")}
+              className="gap-2 rounded-2xl"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              رجوع
             </Button>
             <div className="flex items-center gap-3 text-right">
               <div>
-                <h1 className="text-xl font-black text-foreground">مرشد العلاج الطبيعي</h1>
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary">Clinical Excellence</p>
+                <h1 className="text-xl font-black text-foreground">
+                  مرشد العلاج الطبيعي
+                </h1>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary">
+                  Clinical Excellence
+                </p>
               </div>
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
                 <Sparkles size={20} />
@@ -181,98 +353,241 @@ export default function PhysioMaster() {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="container pt-5 pb-2">
+      <div className="container pb-2 pt-5">
         <PhysioTabNav activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
 
-      {/* Content */}
       <main className="container pb-12">
         <div className="mx-auto max-w-5xl space-y-6 pt-4">
           {activeTab === "daily" && (
-            <DailyTab pomoMode={pomoMode} pomoTime={pomoTime} pomoActive={pomoActive} setPomoActive={setPomoActive} setPomoTime={setPomoTime} formatPomoTime={formatPomoTime} startDate={startDate} dayInfo={dayInfo} setActiveTab={setActiveTab} loadingTopic={loadingTopic} dailyTopic={dailyTopic} handleGenerateQuiz={handleGenerateQuiz} loadingQuiz={loadingQuiz} quiz={quiz} setQuiz={setQuiz} fetchDailyTopic={fetchDailyTopic} showReasoningBuilder={showReasoningBuilder} setShowReasoningBuilder={setShowReasoningBuilder} reasoningData={reasoningData} setReasoningData={setReasoningData} assessmentChecklist={assessmentChecklist} setAssessmentChecklist={setAssessmentChecklist} />
+            <DailyTab
+              pomoMode={pomoMode}
+              pomoTime={pomoTime}
+              pomoActive={pomoActive}
+              setPomoActive={setPomoActive}
+              setPomoTime={setPomoTime}
+              formatPomoTime={formatPomoTime}
+              startDate={startDate}
+              dayInfo={dayInfo}
+              setActiveTab={setActiveTab}
+              loadingTopic={loadingTopic}
+              dailyTopic={dailyTopic}
+              handleGenerateQuiz={handleGenerateQuiz}
+              loadingQuiz={loadingQuiz}
+              quiz={quiz}
+              setQuiz={setQuiz}
+              fetchDailyTopic={fetchDailyTopic}
+              showReasoningBuilder={showReasoningBuilder}
+              setShowReasoningBuilder={setShowReasoningBuilder}
+              reasoningData={reasoningData}
+              setReasoningData={setReasoningData}
+              assessmentChecklist={assessmentChecklist}
+              setAssessmentChecklist={setAssessmentChecklist}
+            />
           )}
           {activeTab === "roadmap" && (
-            <RoadmapTab selectedPhase={selectedPhase} setSelectedPhase={setSelectedPhase} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} completedDays={completedDays} toggleDayCompletion={toggleCurriculumTask} />
+            <RoadmapTab
+              selectedPhase={selectedPhase}
+              setSelectedPhase={setSelectedPhase}
+              selectedMonth={selectedMonth}
+              setSelectedMonth={setSelectedMonth}
+              completedDays={completedDays}
+              toggleDayCompletion={toggleCurriculumTask}
+            />
           )}
           {activeTab === "tasks" && (
-            <TasksTab newTask={newTask} setNewTask={setNewTask} addTask={addTask} tasks={tasks} toggleTask={toggleTask} deleteTask={deleteTask} notes={notes} setNotes={setNotes} />
+            <TasksTab
+              newTask={newTask}
+              setNewTask={setNewTask}
+              addTask={addTask}
+              tasks={tasks}
+              toggleTask={toggleTask}
+              deleteTask={deleteTask}
+              notes={notes}
+              setNotes={setNotes}
+            />
           )}
           {activeTab === "library" && (
-            <LibraryTab searchQuery={searchQuery} setSearchQuery={setSearchQuery} bmi={bmi} setBmi={setBmi} calculateBMI={calculateBMI} setSelectedTest={setSelectedTest} />
+            <LibraryTab
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              bmi={bmi}
+              setBmi={setBmi}
+              calculateBMI={calculateBMI}
+              setSelectedTest={setSelectedTest}
+            />
           )}
-
-          {/* AI Consultant Tab - Inline */}
           {activeTab === "ai" && (
             <div className="space-y-6">
               <div className="rounded-[2rem] bg-gradient-to-br from-blue-600 via-cyan-600 to-emerald-600 p-6 text-right text-white shadow-xl">
                 <div className="mb-3 flex items-center justify-between">
-                  <a href="https://physionutrition.vercel.app/ar/insights" target="_blank" rel="noreferrer" className="rounded-2xl bg-white/15 p-3 hover:bg-white/25 transition-colors"><ExternalLink size={18} /></a>
-                  <div className="flex items-center gap-3"><Bot size={24} /><h3 className="text-2xl font-black">مركز الاستشارة الذكية</h3></div>
+                  <a
+                    href="https://physionutrition.vercel.app/ar/insights"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-2xl bg-white/15 p-3 transition-colors hover:bg-white/25"
+                  >
+                    <ExternalLink size={18} />
+                  </a>
+                  <div className="flex items-center gap-3">
+                    <Bot size={24} />
+                    <h3 className="text-2xl font-black">
+                      مركز الاستشارة الذكية
+                    </h3>
+                  </div>
                 </div>
-                <p className="leading-7 text-cyan-50">استخدم الشات الذكي الحالي بالمشروع مع prompts سريرية، واستفد من روابط التغذية العلاجية ومكتبة الإصابات في نفس المكان.</p>
+                <p className="leading-7 text-cyan-50">
+                  استخدم الشات الذكي الحالي بالمشروع مع prompts سريرية، واستفد
+                  من روابط التغذية العلاجية ومكتبة الإصابات في نفس المكان.
+                </p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
-                <a href="/chat" className="rounded-[2rem] border border-border bg-card p-5 text-right shadow-sm hover:shadow-md transition-shadow">
-                  <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-primary">AI</p>
-                  <h4 className="font-black text-foreground">افتح الشات الذكي</h4>
-                  <p className="text-sm text-muted-foreground">للنقاش السريري وصياغة أسئلة مذاكرة.</p>
+                <a
+                  href="/chat"
+                  className="rounded-[2rem] border border-border bg-card p-5 text-right shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-primary">
+                    AI
+                  </p>
+                  <h4 className="font-black text-foreground">
+                    افتح الشات الذكي
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    للنقاش السريري وصياغة أسئلة مذاكرة.
+                  </p>
                 </a>
-                <a href="https://physionutrition.vercel.app/ar/calculators" target="_blank" rel="noreferrer" className="rounded-[2rem] border border-border bg-card p-5 text-right shadow-sm hover:shadow-md transition-shadow">
-                  <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-emerald-600">Nutrition</p>
-                  <h4 className="font-black text-foreground">حاسبات التغذية</h4>
-                  <p className="text-sm text-muted-foreground">BMI وCalories وMacros.</p>
+                <a
+                  href="https://physionutrition.vercel.app/ar/calculators"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-[2rem] border border-border bg-card p-5 text-right shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-emerald-600">
+                    Nutrition
+                  </p>
+                  <h4 className="font-black text-foreground">
+                    حاسبات التغذية
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    BMI وCalories وMacros.
+                  </p>
                 </a>
-                <a href="https://physionutrition.vercel.app/ar/injuries" target="_blank" rel="noreferrer" className="rounded-[2rem] border border-border bg-card p-5 text-right shadow-sm hover:shadow-md transition-shadow">
-                  <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-cyan-600">Library</p>
-                  <h4 className="font-black text-foreground">مكتبة الإصابات</h4>
-                  <p className="text-sm text-muted-foreground">بروتوكولات وتعافي مبني على الأدلة.</p>
+                <a
+                  href="https://physionutrition.vercel.app/ar/injuries"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-[2rem] border border-border bg-card p-5 text-right shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-cyan-600">
+                    Library
+                  </p>
+                  <h4 className="font-black text-foreground">
+                    مكتبة الإصابات
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    بروتوكولات وتعافٍ مبني على الأدلة.
+                  </p>
                 </a>
               </div>
             </div>
           )}
-
-          {/* Settings Tab - Inline */}
           {activeTab === "settings" && (
             <div className="space-y-4">
               <div className="rounded-[2rem] border border-border bg-card p-6 text-right shadow-sm">
-                <h3 className="mb-4 text-xl font-black text-foreground">{user?.name || "الطالب"}</h3>
+                <h3 className="mb-4 text-xl font-black text-foreground">
+                  {user?.name || user?.email || "الطالب"}
+                </h3>
                 <div className="grid gap-3 md:grid-cols-3">
                   <label className="rounded-2xl border border-border bg-muted/30 p-4">
-                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">بداية الخطة <Calendar size={14} /></span>
-                    <input type="date" value={startDate ?? ""} onChange={(event) => setStartDate(event.target.value || null)} className="w-full rounded-xl border border-border bg-card px-3 py-2 text-right text-sm outline-none" />
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">
+                      بداية الخطة <Calendar size={14} />
+                    </span>
+                    <input
+                      type="date"
+                      value={startDate ?? ""}
+                      onChange={(event) =>
+                        setStartDate(event.target.value || null)
+                      }
+                      className="w-full rounded-xl border border-border bg-card px-3 py-2 text-right text-sm outline-none"
+                    />
                   </label>
-                  <button onClick={() => setDailyReminder((value) => !value)} className="rounded-2xl border border-border bg-muted/30 p-4 text-right">
-                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">تنبيه الدراسة <Bell size={14} /></span>
-                    <p className="text-sm font-bold text-foreground">{dailyReminder ? "مفعل ✅" : "متوقف"}</p>
+                  <button
+                    onClick={() => void toggleDailyReminder()}
+                    className="rounded-2xl border border-border bg-muted/30 p-4 text-right"
+                  >
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">
+                      تنبيه الدراسة <Bell size={14} />
+                    </span>
+                    <p className="text-sm font-bold text-foreground">
+                      {dailyReminder ? "مفعل كل 24 ساعة" : "متوقف"}
+                    </p>
                   </button>
-                  <button onClick={() => setWaterReminder((value) => !value)} className="rounded-2xl border border-border bg-muted/30 p-4 text-right">
-                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">شرب الماء <Droplets size={14} /></span>
-                    <p className="text-sm font-bold text-foreground">{waterReminder ? "مفعل ✅" : "متوقف"}</p>
+                  <button
+                    onClick={() => void toggleWaterReminder()}
+                    className="rounded-2xl border border-border bg-muted/30 p-4 text-right"
+                  >
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">
+                      شرب الماء <Droplets size={14} />
+                    </span>
+                    <p className="text-sm font-bold text-foreground">
+                      {waterReminder ? "مفعل كل ساعتين" : "متوقف"}
+                    </p>
                   </button>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
-                  <button onClick={() => setDarkMode((value) => !value)} className="rounded-2xl border border-border bg-muted/30 p-4 text-right">
-                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">الوضع الليلي {darkMode ? <Moon size={14} /> : <Sun size={14} />}</span>
-                    <p className="text-sm font-bold text-foreground">{darkMode ? "مفعل" : "نهاري"}</p>
+                  <button
+                    onClick={() => setDarkMode((value) => !value)}
+                    className="rounded-2xl border border-border bg-muted/30 p-4 text-right"
+                  >
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">
+                      الوضع الليلي{" "}
+                      {darkMode ? <Moon size={14} /> : <Sun size={14} />}
+                    </span>
+                    <p className="text-sm font-bold text-foreground">
+                      {darkMode ? "مفعل" : "نهاري"}
+                    </p>
                   </button>
                   <div className="rounded-2xl border border-border bg-muted/30 p-4 text-right">
-                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">أيام مكتملة <Calendar size={14} /></span>
-                    <p className="text-sm font-bold text-foreground">{completedDays.length}</p>
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">
+                      أيام مكتملة <Calendar size={14} />
+                    </span>
+                    <p className="text-sm font-bold text-foreground">
+                      {completedDays.length}
+                    </p>
                   </div>
                   <div className="rounded-2xl border border-border bg-muted/30 p-4 text-right">
-                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">مهام منجزة <CheckCircle2 size={14} /></span>
-                    <p className="text-sm font-bold text-foreground">{tasks.filter((task) => task.completed).length}</p>
+                    <span className="mb-2 flex items-center justify-end gap-2 text-xs font-black uppercase text-muted-foreground">
+                      مهام منجزة <CheckCircle2 size={14} />
+                    </span>
+                    <p className="text-sm font-bold text-foreground">
+                      {tasks.filter((task) => task.completed).length}
+                    </p>
                   </div>
                 </div>
-                <Button onClick={() => void logout()} variant="outline" className="mt-4 w-full rounded-2xl">تسجيل الخروج</Button>
+                <Button
+                  onClick={() => void sendTestNotification()}
+                  variant="secondary"
+                  className="mt-4 w-full rounded-2xl"
+                >
+                  إرسال إشعار تجريبي
+                </Button>
+                <Button
+                  onClick={() => void logout()}
+                  variant="outline"
+                  className="mt-4 w-full rounded-2xl"
+                >
+                  تسجيل الخروج
+                </Button>
               </div>
             </div>
           )}
         </div>
       </main>
 
-      <TestDetailModal test={selectedTest} onClose={() => setSelectedTest(null)} />
+      <TestDetailModal
+        test={selectedTest}
+        onClose={() => setSelectedTest(null)}
+      />
     </div>
   );
 }

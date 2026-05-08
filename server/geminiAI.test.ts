@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { testGeminiConnection, chatWithGemini } from "./_core/geminiAI";
 
-describe("Gemini AI Integration", () => {
+const describeGemini = process.env.GEMINI_API_KEY ? describe : describe.skip;
+
+describeGemini("Gemini AI Integration", () => {
   it("should successfully connect to Gemini API", async () => {
     const result = await testGeminiConnection();
     expect(result).toBe(true);
